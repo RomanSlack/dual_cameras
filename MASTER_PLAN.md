@@ -1,4 +1,4 @@
-# dual_camera_recorder — Master Plan
+# dual_cameras — Master Plan
 
 **Status:** research complete, pre-build · **Date:** 2026-06-28 · **Primary platform:** Android · **Also:** iOS
 **Objective:** A federated Flutter plugin that, on supported hardware, captures **front + back cameras simultaneously**, composites them on the GPU in real time, and produces **(a) a single recorded `.mp4`** and **(b) a single composited still photo** — plus a live composited preview. Open-source (MIT) under the RomanSlack brand; consumed by belo for pops/peeks/circles.
@@ -24,19 +24,19 @@ This document is the single source of truth for *what* to build and *in what ord
 Standard 4-package split (mirrors the official `camera` plugin: `camera` / `camera_platform_interface` / `camera_android_camerax` / `camera_avfoundation`). Monorepo, each impl versions independently.
 
 ```
-dual_camera_recorder_flutter/                  # repo root (this repo)
+dual_cameras_flutter/                  # repo root (this repo)
 ├─ packages/
-│  ├─ dual_camera_recorder/                     # APP-FACING — belo depends on THIS only
-│  │  ├─ lib/dual_camera_recorder.dart          #   DualCameraController + DualCameraPreview widget
+│  ├─ dual_cameras/                     # APP-FACING — belo depends on THIS only
+│  │  ├─ lib/dual_cameras.dart          #   DualCameraController + DualCameraPreview widget
 │  │  ├─ example/                               #   canonical example app = manual test harness
 │  │  └─ pubspec.yaml                           #   endorses android+ios via default_package
-│  ├─ dual_camera_recorder_platform_interface/  # PLATFORM INTERFACE — pure Dart, no plugin block
+│  ├─ dual_cameras_platform_interface/  # PLATFORM INTERFACE — pure Dart, no plugin block
 │  │  └─ lib/ … platform_interface.dart, events.dart, messages.g.dart (Pigeon shared types)
-│  ├─ dual_camera_recorder_android/             # ANDROID — Kotlin + CameraX
-│  └─ dual_camera_recorder_ios/                 # iOS — Swift + AVFoundation + Metal
+│  ├─ dual_cameras_android/             # ANDROID — Kotlin + CameraX
+│  └─ dual_cameras_ios/                 # iOS — Swift + AVFoundation + Metal
 ```
 
-- **pub.dev package name:** `dual_camera_recorder` (no `_flutter` suffix on the published package; the repo keeps it).
+- **pub.dev package name:** `dual_cameras` (no `_flutter` suffix on the published package; the repo keeps it).
 - **Endorsement:** app-facing pubspec lists the two impls under `dependencies` *and* `flutter: plugin: platforms: { android: {default_package: …_android}, ios: {default_package: …_ios} }`. Consumers depend only on the app-facing package; impls come transitively.
 - **Interface package** depends on `plugin_platform_interface` and has **no** `flutter: plugin:` block (it's a plain Dart package).
 - **SDK floor:** `flutter: ">=3.24.0"` (the minimum that has the `SurfaceProducer` texture API), `sdk: ^3.5.0`. Pin to the lowest version that has the APIs we actually call.
@@ -241,11 +241,11 @@ Universal: capability-gate first, single-camera/sequential fallback, short clips
 belo (`/home/roman/balo/frontend/messaging_app/`) depends on the **app-facing package only**:
 ```yaml
 # dev (both repos on disk)
-dual_camera_recorder:
-  path: ../../dual_camera_recorder_flutter/packages/dual_camera_recorder
+dual_cameras:
+  path: ../../dual_cameras_flutter/packages/dual_cameras
 # or git (monorepo subdir)
-dual_camera_recorder:
-  git: { url: https://github.com/RomanSlack/dual_camera_recorder_flutter.git, ref: main, path: packages/dual_camera_recorder }
+dual_cameras:
+  git: { url: https://github.com/RomanSlack/dual_cameras_flutter.git, ref: main, path: packages/dual_cameras }
 ```
 Permissions the **consumer** must add (the plugin can't inject them): iOS `NSCameraUsageDescription` + `NSMicrophoneUsageDescription`; Android `CAMERA` + `RECORD_AUDIO`, `minSdkVersion 24`. Runtime prompts remain belo's responsibility (`permission_handler`). Output is a normal `.mp4`/photo that drops straight into belo's existing media-upload pipeline.
 

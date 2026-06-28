@@ -1,0 +1,8 @@
+# Local development only; ignored by `dart pub publish`.
+dependency_overrides:
+  dual_cameras_platform_interface:
+    path: ../dual_cameras_platform_interface
+  dual_cameras_android:
+    path: ../dual_cameras_android
+  dual_cameras_ios:
+    path: ../dual_cameras_ios

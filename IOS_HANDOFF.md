@@ -1,4 +1,4 @@
-# iOS Handoff — `dual_camera_recorder` on iPhone 12 mini
+# iOS Handoff — `dual_cameras` on iPhone 12 mini
 
 **To:** the iOS/Flutter (Swift/Metal) agent
 **From:** the Android engine work, June 28 2026
@@ -17,11 +17,11 @@ Read this first, then `MASTER_PLAN.md §5` and `ARCHITECTURE.md §2,§5–§9` f
 
 ## 1. Current state of the iOS package
 
-Everything compiles *in theory* (written to spec) but **has never been built or run** — no Mac was available. Files (`packages/dual_camera_recorder_ios/ios/Classes/`):
+Everything compiles *in theory* (written to spec) but **has never been built or run** — no Mac was available. Files (`packages/dual_cameras_ios/ios/Classes/`):
 
 | File | Lines | State |
 | --- | --- | --- |
-| `DualCameraRecorderPlugin.swift` | 195 | Pigeon host API wiring, texture registry, command handlers. Review against the regenerated `Messages.g.swift`. |
+| `DualCamerasPlugin.swift` | 195 | Pigeon host API wiring, texture registry, command handlers. Review against the regenerated `Messages.g.swift`. |
 | `DualCameraSession.swift` | 169 | `AVCaptureMultiCamSession` setup, manual connection wiring, AVMultiCamPiP latch, sample delivery, record/photo. **No format selection / no `hardwareCost` handling.** |
 | `MetalCompositor.swift` | 180 | Zero-copy `CVMetalTextureCache` in, BGRA/IOSurface pool out, blend pipeline, rounded-corner SDF. **No rotate-upright / no aspect-cover.** |
 | `Shaders.metal` | 60 | YUV→RGB in-shader, mirror, rounded SDF. **Samples texcoords directly — no orientation/aspect transform.** |
@@ -29,8 +29,8 @@ Everything compiles *in theory* (written to spec) but **has never been built or 
 | `DualCameraTexture.swift` | 27 | `FlutterTexture.copyPixelBuffer` bridge. |
 | `Messages.g.swift` | 749 | Generated Pigeon. **Regenerate** (`dart run pigeon --input pigeons/messages.dart` from the platform-interface package) so all three sides match. |
 
-Android is the working reference — when a behavior is ambiguous, **read the Kotlin** in `packages/dual_camera_recorder_android/.../`:
-`gl/DualCompositor.kt`, `pipeline/RenderThread.kt`, `camera/CameraSource.kt`, `DualCameraRecorderPlugin.kt`.
+Android is the working reference — when a behavior is ambiguous, **read the Kotlin** in `packages/dual_cameras_android/.../`:
+`gl/DualCompositor.kt`, `pipeline/RenderThread.kt`, `camera/CameraSource.kt`, `DualCamerasPlugin.kt`.
 
 ---
 
@@ -60,8 +60,8 @@ On Android the front (selfie) feed came out **stretched and squished**. Root cau
 ## 3. Prioritized work items
 
 ### P0 — make it compile and run on the device
-- **Metal library bundling.** `MetalCompositor` loads `makeDefaultLibrary(bundle: Bundle(for:))`. Confirm `Shaders.metal` is compiled into the pod's resource bundle and the bundle path resolves (classic plugin gotcha — a default-library load returning nil = black output). Check `dual_camera_recorder_ios.podspec` (`resource_bundles` / `s.resources`).
-- **Regenerate Pigeon** and reconcile `DualCameraRecorderPlugin.swift` against it.
+- **Metal library bundling.** `MetalCompositor` loads `makeDefaultLibrary(bundle: Bundle(for:))`. Confirm `Shaders.metal` is compiled into the pod's resource bundle and the bundle path resolves (classic plugin gotcha — a default-library load returning nil = black output). Check `dual_cameras_ios.podspec` (`resource_bundles` / `s.resources`).
+- **Regenerate Pigeon** and reconcile `DualCamerasPlugin.swift` against it.
 - Get a clean `flutter build ios` / Xcode run on a provisioned iPhone 12 mini. Add `NSCameraUsageDescription` + `NSMicrophoneUsageDescription` to the **example** app's `Info.plist`.
 
 ### P0 — multicam format selection + `hardwareCost` (else the session won't run)
@@ -91,7 +91,7 @@ The latch + mirror flags are wired; verify the selfie is mirrored in the **mp4**
 ## 4. Build / test
 
 - **Needs:** a Mac with Xcode + a provisioned **iPhone 12 mini** (multicam can't run on the simulator). Linux/emulator can't exercise any of this.
-- Example app = harness: `packages/dual_camera_recorder/example`, `flutter run -d <iphone>`.
+- Example app = harness: `packages/dual_cameras/example`, `flutter run -d <iphone>`.
 - Signing: set a development team on the Runner target. Camera + mic usage strings in the example `Info.plist`.
 - Pull/validate output the same way as Android: record a clip, AirDrop/extract the `.mp4`, `ffprobe` it (expect h264/hevc video + aac audio, portrait dims, sane duration).
 
@@ -114,13 +114,13 @@ The latch + mirror flags are wired; verify the selfie is mirrored in the **mp4**
 Android has a live tuning panel that made the orientation/aspect problem solvable on-device without native rebuilds. **Port it to iOS before fighting the shader** — it's the fastest path through §2.
 
 Reference implementation (Android), copy the shape:
-- **Native:** a `MethodChannel("dual_camera_recorder/debug")` registered in `DualCameraRecorderPlugin.kt` (`onAttachedToEngine`) with handlers `setRotationOffset {front, offset}`, `setAspectOverride {front, aspect}`, `setMirrorFront {on}`. They forward to live-mutable vars on the compositor (`DualCompositor.setRotationOffset/setAspectOverride`) — raw sensor degrees and the offset are stored separately so the offset re-applies cleanly.
-- **Dart (shared example):** the panel already exists in `packages/dual_camera_recorder/example/lib/main.dart` (`_debugPanel`, `_rotationRow`, `_aspectRow`, `_setRotation/_setAspect/_setMirror`) talking to that same channel. **It is platform-agnostic** — once the iOS plugin registers the same `dual_camera_recorder/debug` channel and wires the same three methods into `MetalCompositor`, the existing UI drives iOS for free.
+- **Native:** a `MethodChannel("dual_cameras/debug")` registered in `DualCamerasPlugin.kt` (`onAttachedToEngine`) with handlers `setRotationOffset {front, offset}`, `setAspectOverride {front, aspect}`, `setMirrorFront {on}`. They forward to live-mutable vars on the compositor (`DualCompositor.setRotationOffset/setAspectOverride`) — raw sensor degrees and the offset are stored separately so the offset re-applies cleanly.
+- **Dart (shared example):** the panel already exists in `packages/dual_cameras/example/lib/main.dart` (`_debugPanel`, `_rotationRow`, `_aspectRow`, `_setRotation/_setAspect/_setMirror`) talking to that same channel. **It is platform-agnostic** — once the iOS plugin registers the same `dual_cameras/debug` channel and wires the same three methods into `MetalCompositor`, the existing UI drives iOS for free.
 
 iOS plumbing:
 1. `MetalCompositor`: add live vars `frontRotationOffset`/`backRotationOffset` (degrees) and `frontAspectOverride`/`backAspectOverride` (`<= 0` = use reported), feeding the per-feed texture-transform computed in §2. Add setters.
 2. `DualCameraSession`: forward setters to the compositor (hop to `dataQueue`).
-3. `DualCameraRecorderPlugin.swift`: register the `FlutterMethodChannel` and route the three methods, mirroring `handleDebug` in `DualCameraRecorderPlugin.kt`.
+3. `DualCamerasPlugin.swift`: register the `FlutterMethodChannel` and route the three methods, mirroring `handleDebug` in `DualCamerasPlugin.kt`.
 
 Find the right values on the 12 mini, then bake them as defaults (and, like Android, fold a permanent aspect correction into the equivalent of `setSourceSize` so the knob isn't needed in release). **Strip the debug channel/panel or gate behind `kDebugMode` before pub.dev publish.**
 
@@ -142,5 +142,5 @@ Find the right values on the 12 mini, then bake them as defaults (and, like Andr
 
 - Engine design: `ARCHITECTURE.md` (§2 data flow, §5 sync, §5.2 Metal, §6 encoder, §9 cold-start, §12 gotchas).
 - What to build / phasing: `MASTER_PLAN.md §5`.
-- Android reference (the working truth): `packages/dual_camera_recorder_android/android/src/main/kotlin/com/romanslack/dual_camera_recorder_android/` — especially `gl/DualCompositor.kt` (`texXform`, `setSourceSize`, rotation offsets) and `pipeline/RenderThread.kt`.
+- Android reference (the working truth): `packages/dual_cameras_android/android/src/main/kotlin/com/romanslack/dual_cameras_android/` — especially `gl/DualCompositor.kt` (`texXform`, `setSourceSize`, rotation offsets) and `pipeline/RenderThread.kt`.
 - Orientation/aspect finding (memory): a 4:3 source needs aspect `0.75` on Pixel 8 because the source is consumed rotated-upright; iOS must produce that rotation itself.

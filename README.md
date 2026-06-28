@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="readme_assets/banner.png" alt="Dual Camera Recorder — record the front and back cameras simultaneously in Flutter, composited into a single portrait video" width="820">
+  <img src="readme_assets/banner.png" alt="Dual Cameras — record the front and back cameras simultaneously in Flutter, composited into a single portrait video" width="820">
 </p>
 
-<h1 align="center">dual_camera_recorder</h1>
+<h1 align="center">dual_cameras</h1>
 
 <p align="center">
   <b>Record the front and back cameras at the same time in Flutter</b> — composited live on the GPU into a <b>single portrait <code>.mp4</code></b> and photo, with a real-time preview. Picture-in-picture, circle inset, or split. The BeReal / Snapchat–style dual-camera capture, as a proper open-source federated plugin for <b>Android &amp; iOS</b>.
@@ -25,15 +25,15 @@
 
 <p align="center">
   Built and maintained by <a href="https://romanslack.com"><b>Roman Slack</b></a> ·
-  <a href="https://github.com/RomanSlack/dual_camera_recorder_flutter">RomanSlack/dual_camera_recorder_flutter</a>
+  <a href="https://github.com/RomanSlack/dual_cameras_flutter">RomanSlack/dual_cameras_flutter</a>
 </p>
 
 > **Status:** **Android — working alpha**, verified end-to-end on a real device (Pixel 8): simultaneous front+back → live preview, recorded composite `.mp4` with in-sync audio, and composited stills. **iOS — alpha, now running on a real iPhone** (iOS 26): the Metal compositor brings up a live composited front+back preview on `AVCaptureMultiCamSession`, with rotate-upright + aspect-cover and the rounded/circle PiP working. Recording and photo run through the same unified compositor (Android parity by construction); full on-device A/V-sync verification is in progress.
 
 **Keywords:** Flutter dual camera · record front and back camera simultaneously · both cameras at once · picture-in-picture video · composite video to mp4 · CameraX concurrent camera · AVCaptureMultiCamSession · BeReal-style capture · multi-camera recording plugin.
 
-- **pub.dev package name (planned):** `dual_camera_recorder`
-- **Repo:** [`github.com/RomanSlack/dual_camera_recorder_flutter`](https://github.com/RomanSlack/dual_camera_recorder_flutter)
+- **pub.dev package name (planned):** `dual_cameras`
+- **Repo:** [`github.com/RomanSlack/dual_cameras_flutter`](https://github.com/RomanSlack/dual_cameras_flutter)
 - **Author:** [Roman Slack](https://romanslack.com) — [GitHub](https://github.com/RomanSlack) · [LinkedIn](https://www.linkedin.com/in/roman-slack-a91a6a266/)
 - **License:** MIT (open-source from day one)
 
@@ -61,16 +61,16 @@ As of mid-2026, **no Flutter plugin records a composited dual-cam video.** The O
 - **Orientation + aspect-cover in the shader** — iOS hands you the raw *landscape* `CVPixelBuffer` (no free rotation like Android's `SurfaceTexture`), so the Metal shader rotates each feed upright and cover-crops it into the portrait canvas itself (port of Android's `texXform`).
 - **Multicam `hardwareCost` gating** — picks a binned ≤720p `activeFormat` per camera and steps frame rate down if the session would exceed the cost budget, so it actually starts.
 - **Same unified compositor** feeds the Flutter preview texture, the `AVAssetWriter` (H.264 + AAC, video PTS off the primary sample buffer / audio passthrough → synced), and the photo — so preview, video, and stills can't drift.
-- **Live debug-tuning** over the shared `dual_camera_recorder/debug` channel (rotation / mirror / source-aspect) to dial in orientation on-device without native rebuilds.
+- **Live debug-tuning** over the shared `dual_cameras/debug` channel (rotation / mirror / source-aspect) to dial in orientation on-device without native rebuilds.
 - **In progress:** full on-device A/V-sync verification over a long clip, proactive thermal downscale, and iOS perf-HUD telemetry.
 
 ## Architecture (federated plugin)
 
 ```
-dual_camera_recorder/                     (app-facing Dart API)
-dual_camera_recorder_platform_interface/  (Pigeon contract: host + flutter APIs)
-dual_camera_recorder_android/             (Kotlin: CameraX concurrent → SurfaceTexture → GLES compositor → MediaCodec/MediaMuxer)
-dual_camera_recorder_ios/                 (Swift: AVCaptureMultiCamSession → Metal compositor → AVAssetWriter)
+dual_cameras/                     (app-facing Dart API)
+dual_cameras_platform_interface/  (Pigeon contract: host + flutter APIs)
+dual_cameras_android/             (Kotlin: CameraX concurrent → SurfaceTexture → GLES compositor → MediaCodec/MediaMuxer)
+dual_cameras_ios/                 (Swift: AVCaptureMultiCamSession → Metal compositor → AVAssetWriter)
 ```
 
 **One unified manual GPU compositor** — GLES on Android, Metal on iOS — is the single core for preview, video, and photo. Cameras are texture sources; we own the compositor, encoder, muxer, and A/V sync. Capture → external (OES/CVMetal) texture → one GPU composite → fan out to encoder + preview (+ photo). Full engine design in **[`ARCHITECTURE.md`](ARCHITECTURE.md)**.
@@ -110,8 +110,8 @@ Add permissions in the **consuming app** (camera + microphone on Android; `NSCam
 - **FOV / look ≠ the native single-camera app.** Concurrent mode caps resolution and bypasses the vendor's computational pipeline (HDR+, etc.); fitting a 4:3 sensor into 9:16 portrait also crops FOV. This is inherent to the public dual-camera API, not a bug.
 - **iOS:** A12+ / iOS 13+. Multicam is power/thermal-heavy — cap clip duration, downscale under thermal pressure, stop cleanly on `thermalStateDidChange`.
 - Audio is captured once (mic) and muxed into the output. Front-camera mirroring must be correct in the recorded file.
-- **Orientation/aspect (Android):** the camera delivers a *landscape* buffer, but its `SurfaceTexture` transform matrix already rotates it 90° upright into the portrait canvas before the shader samples it — so the compositor's aspect-cover uses the **rotated** aspect (`h/w`), not `w/h`. A 4:3 source → `0.75` (verified un-stretched on **Pixel 8**, front *and* back). If a new device looks stretched, the example app's **Debug tuning** panel (live rotation-offset / mirror / source-aspect override over the `dual_camera_recorder/debug` MethodChannel) dials it in without rebuilding native code.
-- **Orientation/aspect (iOS):** unlike Android, `AVCaptureVideoDataOutput` delivers the buffer in the sensor's *native landscape* orientation with **no** free rotation — so the Metal shader does the full rotate-upright + aspect-cover itself (it sees the true `w/h`). The same `dual_camera_recorder/debug` panel tunes the per-feed rotation and aspect on-device; the found values then get baked as defaults.
+- **Orientation/aspect (Android):** the camera delivers a *landscape* buffer, but its `SurfaceTexture` transform matrix already rotates it 90° upright into the portrait canvas before the shader samples it — so the compositor's aspect-cover uses the **rotated** aspect (`h/w`), not `w/h`. A 4:3 source → `0.75` (verified un-stretched on **Pixel 8**, front *and* back). If a new device looks stretched, the example app's **Debug tuning** panel (live rotation-offset / mirror / source-aspect override over the `dual_cameras/debug` MethodChannel) dials it in without rebuilding native code.
+- **Orientation/aspect (iOS):** unlike Android, `AVCaptureVideoDataOutput` delivers the buffer in the sensor's *native landscape* orientation with **no** free rotation — so the Metal shader does the full rotate-upright + aspect-cover itself (it sees the true `w/h`). The same `dual_cameras/debug` panel tunes the per-feed rotation and aspect on-device; the found values then get baked as defaults.
 
 ## Roadmap
 
@@ -128,13 +128,13 @@ Built first for [belo](https://github.com/RomanSlack)'s short-form capture surfa
 
 ## Author
 
-**dual_camera_recorder** is built and maintained by **[Roman Slack](https://romanslack.com)** — software engineer and creator of [belo](https://github.com/RomanSlack).
+**dual_cameras** is built and maintained by **[Roman Slack](https://romanslack.com)** — software engineer and creator of [belo](https://github.com/RomanSlack).
 
 - 🌐 Website — [romanslack.com](https://romanslack.com)
 - 💻 GitHub — [@RomanSlack](https://github.com/RomanSlack)
 - 💼 LinkedIn — [Roman Slack](https://www.linkedin.com/in/roman-slack-a91a6a266/)
 
-If this plugin saved you from writing a native dual-camera compositor, a ⭐ on [the repo](https://github.com/RomanSlack/dual_camera_recorder_flutter) is appreciated. Issues and PRs welcome.
+If this plugin saved you from writing a native dual-camera compositor, a ⭐ on [the repo](https://github.com/RomanSlack/dual_cameras_flutter) is appreciated. Issues and PRs welcome.
 
 ## License
 
@@ -145,5 +145,5 @@ If this plugin saved you from writing a native dual-camera compositor, a ⭐ on 
 ### For agents working in this repo
 
 - **[`MASTER_PLAN.md`](MASTER_PLAN.md)** and **[`ARCHITECTURE.md`](ARCHITECTURE.md)** are the engineering source of truth — native approach per platform, the federated layout, threading model, A/V sync, and perf targets. **Read them first.** **[`BUILD_STATUS.md`](BUILD_STATUS.md)** tracks what is verified vs. hardware-gated.
-- The example app (`packages/dual_camera_recorder/example`) is the live test harness; run it on a concurrent-camera device with `flutter run`.
+- The example app (`packages/dual_cameras/example`) is the live test harness; run it on a concurrent-camera device with `flutter run`.
 - This is a **standalone repo**; the belo app consumes it via a path/git dependency. Do not assume belo's code is importable here.

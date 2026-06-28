@@ -1,0 +1,32 @@
+name: dual_cameras_ios
+description: >-
+  iOS implementation of dual_cameras (AVCaptureMultiCamSession +
+  Metal compositor + AVAssetWriter).
+version: 0.1.0
+repository: https://github.com/RomanSlack/dual_cameras_flutter/tree/main/packages/dual_cameras_ios
+issue_tracker: https://github.com/RomanSlack/dual_cameras_flutter/issues
+topics:
+  - camera
+  - video
+  - recording
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dual_cameras_platform_interface: ^0.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    implements: dual_cameras
+    platforms:
+      ios:
+        pluginClass: DualCamerasPlugin
+        dartPluginClass: DualCamerasIOS

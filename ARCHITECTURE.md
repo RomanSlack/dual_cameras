@@ -1,4 +1,4 @@
-# dual_camera_recorder — Engine Architecture & Performance
+# dual_cameras — Engine Architecture & Performance
 
 **Status:** design locked, pre-build · **Date:** 2026-06-28
 **Companion to:** [`MASTER_PLAN.md`](MASTER_PLAN.md) (what to build / phasing) and [`SCOPE.md`](SCOPE.md) (product). This doc is the **deep engine design** — the real-time pipeline, the performance discipline, and the threading/sync model that make it lag-free. It is the binding reference when the high-level plan and the hot path disagree: **the hot path wins.**
