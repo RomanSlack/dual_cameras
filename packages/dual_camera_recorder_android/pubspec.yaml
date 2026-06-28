@@ -1,0 +1,33 @@
+name: dual_camera_recorder_android
+description: >-
+  Android implementation of dual_camera_recorder (CameraX/Camera2 +
+  manual GLES compositor + MediaCodec).
+version: 0.1.0
+repository: https://github.com/RomanSlack/dual_camera_recorder_flutter/tree/main/packages/dual_camera_recorder_android
+issue_tracker: https://github.com/RomanSlack/dual_camera_recorder_flutter/issues
+topics:
+  - camera
+  - video
+  - recording
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dual_camera_recorder_platform_interface: ^0.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    implements: dual_camera_recorder
+    platforms:
+      android:
+        package: com.romanslack.dual_camera_recorder_android
+        pluginClass: DualCameraRecorderPlugin
+        dartPluginClass: DualCameraRecorderAndroid

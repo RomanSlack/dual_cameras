@@ -1,0 +1,26 @@
+name: dual_camera_recorder_platform_interface
+description: >-
+  Common platform interface for the dual_camera_recorder plugin — front+back
+  simultaneous camera recording and photo capture.
+version: 0.1.0
+repository: https://github.com/RomanSlack/dual_camera_recorder_flutter/tree/main/packages/dual_camera_recorder_platform_interface
+issue_tracker: https://github.com/RomanSlack/dual_camera_recorder_flutter/issues
+topics:
+  - camera
+  - video
+  - recording
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  pigeon: ^22.7.0
+# NOTE: intentionally no `flutter: plugin:` block — this is a plain Dart package.

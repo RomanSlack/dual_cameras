@@ -1,33 +1,42 @@
 # dual_camera_recorder
 
-A native **dual-camera recorder** for Flutter — records the **front and back cameras simultaneously**, composites them in real time (picture-in-picture / split), and writes a **single `.mp4`**. The BeReal / Snapchat dual-camera capture, as a proper federated Flutter plugin for Android and iOS.
+A native **dual-camera recorder** for Flutter — records the **front and back cameras simultaneously**, composites them in real time (picture-in-picture / split) on the GPU, and writes a **single portrait `.mp4`** (plus a composited photo). The BeReal / Snapchat dual-camera capture, as a proper federated Flutter plugin.
 
-> **Status:** scaffolding / pre-alpha. Nothing is built yet — see [`SCOPE.md`](SCOPE.md) for the full design, milestones, and open questions.
+> **Status:** **Android — working alpha**, verified end-to-end on a real device (Pixel 8): simultaneous front+back → live preview, recorded composite `.mp4` with in-sync audio, and composited stills. **iOS — scaffolded** (Swift/Metal written to spec) but **not yet compiled or run**.
 
 - **pub.dev package name (planned):** `dual_camera_recorder`
 - **Repo:** `github.com/RomanSlack/dual_camera_recorder_flutter`
-- **License:** MIT (planned, open-source from day one)
+- **License:** MIT (open-source from day one)
 
 ---
 
 ## The gap this fills
 
-As of mid-2026, **no Flutter plugin records a composited dual-cam video.** The OS APIs can do it — iOS `AVCaptureMultiCamSession`, Android CameraX 1.6 concurrent camera — but every Flutter option (`camera`, `camerawesome`, `multicamera`, `dual_camera`) stops at preview/photos or single-camera recording. This plugin owns the native compositor on both platforms and emits one clean `.mp4`.
+As of mid-2026, **no Flutter plugin records a composited dual-cam video.** The OS APIs can do it — iOS `AVCaptureMultiCamSession`, Android CameraX concurrent camera — but every Flutter option (`camera`, `camerawesome`, `multicamera`, `dual_camera`) stops at preview/photos or single-camera recording. This plugin owns the native compositor on both platforms and emits one clean `.mp4`. The hard, novel part is the **recorded composite** — not the live preview overlay (which is trivial).
 
-The hard, novel part is the **recorded composite** — not the live preview overlay (which is trivial). See `SCOPE.md §1`.
+## What works today (Android)
+
+- **Simultaneous front + back** via CameraX concurrent camera (texture sources only — no `CompositionSettings`).
+- **Unified GPU compositor** (GLES): one composite per frame fans out to the **live preview**, the **encoder**, and **photo** — so preview, video, and stills can never drift.
+- **Portrait, vertical video** — each camera is rotated upright from its sensor orientation and **aspect-cover-cropped** (never stretched) into a 9:16 canvas.
+- **Layouts:** picture-in-picture (rounded-rect **or** circle inset) and split; **live swap** of the full-frame camera; mirrored front feed.
+- **H.264 (MediaCodec, surface input) + AAC (AudioRecord)** muxed by `MediaMuxer`, on a single monotonic clock for A/V sync.
+- **Composited photo** (FBO read-back, JPEG) at the same WYSIWYG geometry.
+- **Capability detection** + graceful single-camera fallback; thermal monitoring; a perf HUD (FPS / composite-ms / dropped frames).
+- Verified on a **Pixel 8**: composited front+back `.mp4` (720×1280, h264 + aac) and photo, saved to the gallery from the example app.
 
 ## Architecture (federated plugin)
 
 ```
 dual_camera_recorder/                     (app-facing Dart API)
-dual_camera_recorder_platform_interface/  (abstract contract + method/event channels)
-dual_camera_recorder_android/             (Kotlin: CameraX/Camera2 → SurfaceTexture → GLES compositor → MediaCodec/MediaMuxer)
+dual_camera_recorder_platform_interface/  (Pigeon contract: host + flutter APIs)
+dual_camera_recorder_android/             (Kotlin: CameraX concurrent → SurfaceTexture → GLES compositor → MediaCodec/MediaMuxer)
 dual_camera_recorder_ios/                 (Swift: AVCaptureMultiCamSession → Metal compositor → AVAssetWriter)
 ```
 
-**One unified manual GPU compositor** — GLES on Android, Metal on iOS — is the single core for **preview, video, and photo** on both platforms. Cameras are texture sources; we own the compositor, encoder, muxer, and A/V sync (we do *not* use CameraX `CompositionSettings`). Chosen for performance + quality + parity over a smaller codebase. The two platforms mirror each other: capture → external texture → one GPU composite → fan out to encoder + preview (+ photo). iOS is the longer pole (more manual session/thermal handling), but the design is symmetric. Full engine design in **[`ARCHITECTURE.md`](ARCHITECTURE.md)**.
+**One unified manual GPU compositor** — GLES on Android, Metal on iOS — is the single core for preview, video, and photo. Cameras are texture sources; we own the compositor, encoder, muxer, and A/V sync. Capture → external (OES/CVMetal) texture → one GPU composite → fan out to encoder + preview (+ photo). Full engine design in **[`ARCHITECTURE.md`](ARCHITECTURE.md)**.
 
-## Target Dart API (draft)
+## Dart API
 
 ```dart
 final cam = DualCameraController();
@@ -36,32 +45,41 @@ if (!await DualCameraController.isSupported()) { /* single-cam fallback */ }
 await cam.initialize(
   layout: DualLayout.pictureInPicture(
     primary: CameraLens.back,
-    insetCorner: Corner.bottomRight,
-    insetScale: 0.28, cornerRadius: 18, margin: 12,
+    insetCorner: InsetCorner.bottomRight,
+    insetScale: 0.32,
+    cornerRadius: 18,
+    circleInset: false,   // true → round inset
   ),
   resolution: DualResolution.hd720, // capped by hardware
 );
 
+// Live preview (letterboxed to the composite's 9:16 — never stretched):
+DualCameraPreview(cam);
+
 await cam.startRecording();
-cam.swapPrimary();                            // flip full-frame camera, live
-final XFile clip = await cam.stopRecording(); // single composited mp4
+cam.swapPrimary();                              // flip full-frame camera, live
+final String clip  = await cam.stopRecording(); // single composited portrait mp4
+final String photo = await cam.takePhoto();     // single composited still
 await cam.dispose();
 ```
 
+Add permissions in the **consuming app** (camera + microphone on Android; `NSCameraUsageDescription` / `NSMicrophoneUsageDescription` on iOS) and request them at runtime before `initialize`.
+
 ## Key constraints (read before coding)
 
+- **Concurrent dual-camera is hardware-limited** — only devices advertising support; **≤720p/1440p** per camera; two cameras max. Capability check + single-camera fallback is **mandatory**.
+- **FOV / look ≠ the native single-camera app.** Concurrent mode caps resolution and bypasses the vendor's computational pipeline (HDR+, etc.); fitting a 4:3 sensor into 9:16 portrait also crops FOV. This is inherent to the public dual-camera API, not a bug.
 - **iOS:** A12+ / iOS 13+. Multicam is power/thermal-heavy — cap clip duration, downscale under thermal pressure, stop cleanly on `thermalStateDidChange`.
-- **Android:** only devices advertising concurrent-camera support; **≤720p/1440p**; two cameras max. Capability check + single-camera fallback is **mandatory**, not optional.
-- Audio captured once (mic), muxed into the output. Front-camera mirroring must be correct in the recorded file.
+- Audio is captured once (mic) and muxed into the output. Front-camera mirroring must be correct in the recorded file.
 
-## Roadmap (see `MASTER_PLAN.md §9`)
+## Roadmap
 
-0. Spike: federated skeleton + simultaneous **preview** + capability detection on both platforms.
-1. **Android** manual GL compositor → MediaCodec → MediaMuxer; AudioRecord + one-clock A/V sync.
-2. **Android** photo (hi-res FBO re-render of the same shaders) + the perf-measurement HUD.
-3. **iOS** `AVCaptureMultiCamSession` → Metal compositor → `AVAssetWriter` (+ photo); same perf targets.
-4. Unify Dart API, layouts (PiP + split), live swap, ThermalGovernor, error events.
-5. Polish, docs, pub.dev publish.
+- [x] **0.** Federated skeleton + simultaneous preview + capability detection (Android).
+- [x] **1.** Android manual GL compositor → MediaCodec → MediaMuxer; AudioRecord + one-clock A/V sync.
+- [x] **2.** Android photo (FBO re-render) + perf HUD; portrait orientation, sensor-rotation, aspect-fill, circle/PiP/split.
+- [ ] **3.** iOS `AVCaptureMultiCamSession` → Metal compositor → `AVAssetWriter` (+ photo) — **scaffolded, not yet built/run** (needs macOS + Xcode + an A12+ iPhone).
+- [ ] **4.** Resolution options (1440p where supported), richer layout controls, device-orientation handling beyond portrait.
+- [ ] **5.** Polish, docs, pub.dev publish.
 
 ## Why it exists / who uses it
 
@@ -71,7 +89,6 @@ Built first for [belo](https://github.com/RomanSlack)'s short-form capture surfa
 
 ### For agents working in this repo
 
-- **[`MASTER_PLAN.md`](MASTER_PLAN.md)** is the engineering source of truth — native approach per platform (video + photo), the federated layout, device matrix, risks, and the phased build order. **Read it first.**
-- **[`SCOPE.md`](SCOPE.md)** is the product scope and open sign-off questions.
-- This is a **standalone repo**; the belo app will consume it via a path/git dependency. Do not assume belo's code is importable here.
-- Decided so far: open-source from day one, MIT, package name `dual_camera_recorder`, federated layout. Still open (see `SCOPE.md §9`): PiP-only vs PiP+split for v1, resolution parity, and build sequencing (Phase 0 spike vs straight to Android record path).
+- **[`MASTER_PLAN.md`](MASTER_PLAN.md)** and **[`ARCHITECTURE.md`](ARCHITECTURE.md)** are the engineering source of truth — native approach per platform, the federated layout, threading model, A/V sync, and perf targets. **Read them first.** **[`BUILD_STATUS.md`](BUILD_STATUS.md)** tracks what is verified vs. hardware-gated.
+- The example app (`packages/dual_camera_recorder/example`) is the live test harness; run it on a concurrent-camera device with `flutter run`.
+- This is a **standalone repo**; the belo app consumes it via a path/git dependency. Do not assume belo's code is importable here.

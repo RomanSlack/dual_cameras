@@ -1,0 +1,35 @@
+name: dual_camera_recorder_example
+description: "Demonstrates dual_camera_recorder: front+back simultaneous capture."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  dual_camera_recorder:
+    path: ../
+  permission_handler: ^11.3.1
+  gal: ^2.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+# The federated packages aren't published yet — resolve them locally.
+dependency_overrides:
+  dual_camera_recorder:
+    path: ../
+  dual_camera_recorder_platform_interface:
+    path: ../../dual_camera_recorder_platform_interface
+  dual_camera_recorder_android:
+    path: ../../dual_camera_recorder_android
+  dual_camera_recorder_ios:
+    path: ../../dual_camera_recorder_ios
+
+flutter:
+  uses-material-design: true

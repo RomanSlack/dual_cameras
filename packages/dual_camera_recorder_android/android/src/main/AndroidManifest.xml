@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      The consuming app must declare CAMERA and RECORD_AUDIO permissions and
+      request them at runtime. We only declare the hardware features here (not
+      required, so the plugin doesn't exclude devices that lack a camera).
+    -->
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.concurrent" android:required="false" />
+</manifest>

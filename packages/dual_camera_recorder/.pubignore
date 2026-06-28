@@ -1,0 +1,12 @@
+# Build artifacts and tool caches (no .gitignore in this package by default).
+build/
+.dart_tool/
+# Keep example/lib for the pub.dev Example tab; drop heavy example artifacts.
+example/build/
+example/.dart_tool/
+example/.flutter-plugins
+example/.flutter-plugins-dependencies
+example/*.iml
+example/android/
+example/ios/
+example/pubspec.lock

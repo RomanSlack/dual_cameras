@@ -1,0 +1,4 @@
+# Local development only; ignored by `dart pub publish`.
+dependency_overrides:
+  dual_camera_recorder_platform_interface:
+    path: ../dual_camera_recorder_platform_interface
